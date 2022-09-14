@@ -1,3 +1,4 @@
+import cgi
 from pathlib import Path
 
 from database import conn
@@ -26,6 +27,18 @@ def get_post_list(posts):
     return '\n'.join(post_list)
 
 
+def add_new_post(post):
+    cursor = conn.cursor()
+    cursor.execute(
+        """\
+        INSERT INTO post (title, content, author)
+        VALUES (:title, :content, :author)
+        """,
+        post
+    )
+    conn.commit()
+
+
 def application(environ, start_response):
     path = environ['PATH_INFO']
     method = environ['REQUEST_METHOD']
@@ -35,11 +48,20 @@ def application(environ, start_response):
     if path == '/' and method == 'GET':
         posts = get_posts_from_database()
         body = render_template('list.template.html', post_list=get_post_list(posts))
-        status = '200 OK'
+        status = '200 Ok'
     elif path.split('/')[-1].isdigit() and method == 'GET':
         post_id = path.split('/')[-1]
         body = render_template('post.template.html', post=get_posts_from_database(post_id=post_id)[0])
-        status = '200 OK'
+        status = '200 Ok'
+    elif path == '/new' and method == 'GET':
+        body = render_template('form.template.html')
+        status = '200 Ok'
+    elif path == '/new' and method == 'POST':
+        form = cgi.FieldStorage(fp=environ['wsgi.input'], environ=environ, keep_blank_values=1)
+        post = {item.name: item.value for item in form.list}
+        add_new_post(post)
+        body = b'New post created successfully'
+        status = '201 Created.'
 
     headers = [('Content-type', 'text/html')]
     start_response(status, headers)
